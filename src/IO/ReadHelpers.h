@@ -26,6 +26,7 @@
 
 #include <Common/Allocator.h>
 #include <Common/Exception.h>
+#include <Common/hex.h>
 #include <Common/StringUtils/StringUtils.h>
 #include <Common/Arena.h>
 #include <Common/intExp.h>
@@ -516,6 +517,7 @@ void readIntTextUnsafe(T & x, ReadBuffer & buf)
     /// See note about undefined behaviour above.
     x = is_signed_v<T> && negative ? -res : res;
 }
+
 
 template <typename T>
 void tryReadIntTextUnsafe(T & x, ReadBuffer & buf)
@@ -1574,4 +1576,36 @@ void readQuotedField(String & s, ReadBuffer & buf);
 void readJSONField(String & s, ReadBuffer & buf);
 
 void readTSVField(String & s, ReadBuffer & buf);
+
+
+    template <typename T, bool throw_on_error = true>
+    void readUintHexTextUnsafe(T & x, ReadBuffer & buf)
+    {
+        //    make_unsigned_t<T> res = 0;
+
+        auto on_error = []
+        {
+            if (throw_on_error)
+                throwReadAfterEOF();
+        };
+
+        if (unlikely(buf.eof()))
+            return on_error();
+        size_t type_size = sizeof(T) * 2 + 1;
+        char buffer[sizeof(T) * 2 + 1];
+        std::memset(buffer, '0', type_size);
+        buffer[type_size - 1] = '\0';
+        size_t str_length = 0;
+        if(*buf.position() == '\"') buf.position()++;
+        if(*buf.position() == '0' && *(buf.position() + 1) == 'x') buf.position() += 2;
+        const char *start_pos = buf.position();
+        while(*buf.position() != '\"')
+        {
+            str_length++;
+            buf.position()++;
+        }
+        std::memcpy(buffer + (type_size - str_length - 1), start_pos, str_length);
+        x = unhexUInt<T>(buffer);
+    }
 }
+

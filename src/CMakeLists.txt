@@ -78,7 +78,7 @@ add_subdirectory (Loggers)
 
 
 set(dbms_headers)
-set(dbms_sources)
+set(dbms_sources Storages/Web3/StorageWeb3TransactionPoller.cpp Storages/Web3/StorageWeb3TransactionPoller.h)
 
 add_headers_and_sources(clickhouse_common_io Common)
 add_headers_and_sources(clickhouse_common_io Common/HashTable)
@@ -93,6 +93,9 @@ add_headers_and_sources(dbms Disks/ObjectStorages)
 if (TARGET ch_contrib::sqlite)
     add_headers_and_sources(dbms Databases/SQLite)
 endif()
+
+# Web3 
+add_headers_and_sources(dbms Storages/Web3)
 
 if (TARGET ch_contrib::rdkafka)
     add_headers_and_sources(dbms Storages/Kafka)

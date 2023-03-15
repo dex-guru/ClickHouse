@@ -29,6 +29,10 @@ void registerStorageWindowView(StorageFactory & factory);
 // MEILISEARCH
 void registerStorageMeiliSearch(StorageFactory& factory);
 
+// Web3
+void registerStorageWeb3BlockPoller(StorageFactory & factory);
+void registerStorageWeb3TransactionPoller(StorageFactory & factory);
+
 #if USE_AWS_S3
 void registerStorageS3(StorageFactory & factory);
 void registerStorageCOS(StorageFactory & factory);
@@ -114,6 +118,10 @@ void registerStorages()
     registerStorageGenerateRandom(factory);
     registerStorageExecutable(factory);
     registerStorageWindowView(factory);
+
+		// Web3
+    registerStorageWeb3BlockPoller(factory);
+    registerStorageWeb3TransactionPoller(factory);
 
     // MEILISEARCH
     registerStorageMeiliSearch(factory);
