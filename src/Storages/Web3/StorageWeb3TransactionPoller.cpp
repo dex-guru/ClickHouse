@@ -5,6 +5,7 @@
 #include <Storages/Web3/StorageWeb3TransactionPoller.h>
 #include <Storages/StorageFactory.h>
 #include <Storages/ExternalDataSourceConfiguration.h>
+#include <Interpreters/Context.h>
 
 namespace DB {
 
@@ -15,6 +16,38 @@ namespace DB {
         extern const int NUMBER_OF_ARGUMENTS_DOESNT_MATCH;
         extern const int QUERY_NOT_ALLOWED;
     }
+
+    TransactionSink::TransactionSink(
+        StorageWeb3TransactionPoller & storage_,
+        StorageMetadataPtr metadata_snapshot_,
+        [[maybe_unused]]size_t max_parts_per_block_,
+        [[maybe_unused]]ContextPtr context_)
+        : SinkToStorage(metadata_snapshot_->getSampleBlock())
+        , storage(storage_)
+    {
+
+    }
+
+    void TransactionSink::consume(Chunk chunk)
+    {
+        auto block = getHeader().cloneWithColumns(chunk.detachColumns());
+        for(auto& col : block.getColumns())
+        {
+            [[maybe_unused]] size_t s = col->size();
+        }
+    }
+
+    void TransactionSink::onStart()
+    {
+
+    }
+
+    void TransactionSink::onFinish()
+    {
+
+    }
+
+    TransactionSink::~TransactionSink() {}
 
     StorageWeb3TransactionPoller::StorageWeb3TransactionPoller(
         const StorageID & table_id_,
@@ -50,10 +83,10 @@ namespace DB {
     }
 
     void StorageWeb3TransactionPoller::read(
-        [[maybe_unused]]QueryPlan & query_plan,
-        [[maybe_unused]]const Names & column_names,
+        QueryPlan & /*query_plan*/,
+        const Names & /*column_names*/,
         const StorageSnapshotPtr & /*storage_snapshot*/,
-        [[maybe_unused]]SelectQueryInfo & query_info,
+        SelectQueryInfo & /*query_info*/,
         ContextPtr /*context*/,
         QueryProcessingStage::Enum /*processed_stage*/,
         size_t /*max_block_size*/,
@@ -64,10 +97,12 @@ namespace DB {
 
     SinkToStoragePtr StorageWeb3TransactionPoller::write(
         const ASTPtr & /*query*/,
-        const StorageMetadataPtr & /*metadata_snapshot*/,
-        ContextPtr /*context*/)
+        const StorageMetadataPtr & metadata_snapshot,
+        ContextPtr context_)
     {
-        throw Exception(ErrorCodes::QUERY_NOT_ALLOWED, "Direct select is not allowed");
+        const auto & settings = context_->getSettingsRef();
+        return std::make_shared<TransactionSink>(
+            *this, metadata_snapshot, settings.max_partitions_per_insert_block, context_);
     }
 
     void registerStorageWeb3TransactionPoller(StorageFactory & factory)

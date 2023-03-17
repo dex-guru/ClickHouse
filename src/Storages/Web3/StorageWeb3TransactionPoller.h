@@ -10,9 +10,12 @@
 #include <Storages/Web3/StorageWeb3BlockPollerSettings.h>
 #include <Storages/Web3/Web3Source.h>
 #include <Storages/Web3/Web3Client.h>
+#include <Processors/Sinks/SinkToStorage.h>
 
 namespace DB
 {
+    class TransactionSink;
+
     class StorageWeb3TransactionPoller : public IStorage, WithContext
     {
     public:
@@ -60,6 +63,25 @@ namespace DB
         const String format_name;
     [[maybe_unused]] bool is_attach;
         Poco::Logger * log;
+    };
+
+    class TransactionSink : public SinkToStorage
+    {
+    public:
+        TransactionSink(StorageWeb3TransactionPoller & storage_,
+                        StorageMetadataPtr metadata_snapshot_,
+                        size_t max_parts_per_block_,
+                        ContextPtr context_);
+
+        ~TransactionSink() override;
+
+        String getName() const override { return "TransactionSink"; }
+        void consume(Chunk chunk) override;
+        void onStart() override;
+        void onFinish() override;
+
+    private:
+        StorageWeb3TransactionPoller& storage;
     };
 }
 #endif //CLICKHOUSE_STORAGEWEB3TRANSACTIONPOLLER_H
