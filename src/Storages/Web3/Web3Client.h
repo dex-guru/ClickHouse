@@ -28,6 +28,7 @@ namespace DB{
             // Web3 calls
             void getLastBlockNumber();
             void getBlock(uint64_t block_number);
+            void getTransaction(String transaction_hash);
             void getTransactionReceipt(String transaction_hash);
             // --------
 

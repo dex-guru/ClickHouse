@@ -45,6 +45,18 @@ namespace DB {
             connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
         }
 
+        void Web3Client::getTransaction(String transaction_hash)
+        {
+            auto request = NodeCall{"eth_getTransactionByHash", {transaction_hash}, "1"};
+            connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
+        }
+
+        void Web3Client::getTransactionReceipt(String transaction_hash)
+        {
+            auto request = NodeCall{"eth_getTransactionReceipt", {transaction_hash}, "1"};
+            connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
+        }
+
         void Web3Client::receiveRequestCallback(String&& data_string)
         {
             if(message_queue.push(std::move(data_string)))
