@@ -125,7 +125,7 @@ namespace DB {
             if (!web3block_settings->message_format.changed)
                 throw Exception( ErrorCodes::NUMBER_OF_ARGUMENTS_DOESNT_MATCH, "You must specify `message_format` setting");
 
-            return std::make_shared<StorageWeb3BlockPoller>(args.table_id, args.getContext(), args.columns, std::move(web3block_settings), args.attach);
+            return std::make_shared<StorageWeb3TransactionPoller>(args.table_id, args.getContext(), args.columns, std::move(web3block_settings), args.attach);
         };
 
         factory.registerStorage("Web3Transaction", creator_fn, StorageFactory::StorageFeatures{ .supports_settings = true, });
