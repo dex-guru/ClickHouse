@@ -44,7 +44,7 @@ namespace DB {
 
 				std::string getName() const override { return "Web3Block"; }
 
-				bool noPushingToViews() const override { return true; }
+				bool noPushingToViews() const override { return false; }
 
 				const String & getFormatName() const { return format_name; }
 

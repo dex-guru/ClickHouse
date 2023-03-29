@@ -8,6 +8,7 @@
 #include <Storages/StorageFactory.h>
 #include <Storages/Web3/Web3Source.h>
 #include <Interpreters/InterpreterInsertQuery.h>
+#include <Interpreters/Context.h>
 #include <Storages/IStorage.h>
 #include <ctime>
 
@@ -124,12 +125,11 @@ namespace DB {
 		}
 
 		SinkToStoragePtr StorageWeb3BlockPoller::write(
-				const ASTPtr & /*query*/,
-				const StorageMetadataPtr & /*metadata_snapshot*/,
-				ContextPtr /*context*/)
+            const ASTPtr & /*query*/,
+            const StorageMetadataPtr & /*metadata_snapshot*/,
+            ContextPtr /*context*/)
 		{
-//                query->getTreeHash();
-				throw Exception(ErrorCodes::QUERY_NOT_ALLOWED, "Direct select is not allowed");
+            throw Exception(ErrorCodes::QUERY_NOT_ALLOWED, "Direct select is not allowed");
 		}
 
 		void StorageWeb3BlockPoller::startup()

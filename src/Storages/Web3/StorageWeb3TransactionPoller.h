@@ -28,7 +28,7 @@ namespace DB
 
         std::string getName() const override { return "Web3Transactions"; }
 
-        bool noPushingToViews() const override { return true; }
+        bool noPushingToViews() const override { return false; }
 
         const String & getFormatName() const { return format_name; }
 
