@@ -78,7 +78,7 @@ add_subdirectory (Loggers)
 
 
 set(dbms_headers)
-set(dbms_sources Storages/Web3/StorageWeb3TransactionPoller.cpp Storages/Web3/StorageWeb3TransactionPoller.h)
+set(dbms_sources)
 
 add_headers_and_sources(clickhouse_common_io Common)
 add_headers_and_sources(clickhouse_common_io Common/HashTable)
