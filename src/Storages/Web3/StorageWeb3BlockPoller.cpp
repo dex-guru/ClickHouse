@@ -13,23 +13,69 @@
 
 #include <Processors/Executors/CompletedPipelineExecutor.h>
 #include <Processors/Executors/PushingPipelineExecutor.h>
+#include <Processors/Sinks/SinkToStorage.h>
 #include <QueryPipeline/Pipe.h>
 #include <Core/Field.h>
+#include <Core/Types.h>
 
 
 namespace DB {
 
 		namespace ErrorCodes
 		{
-				extern const int LOGICAL_ERROR;
 				extern const int BAD_ARGUMENTS;
 				extern const int NUMBER_OF_ARGUMENTS_DOESNT_MATCH;
 				extern const int QUERY_NOT_ALLOWED;
 		}
 
-        void Web3NumerableType::setCustomization_(DataTypeCustomDescPtr custom_desc_) const
+        void Web3NumerableType::updateSerializer() const
         {
-            setCustomization(std::move(custom_desc_));
+            SerializationPtr serializer;
+            auto type_name = std::make_unique<DataTypeCustomFixedName>(getName());
+            auto type_id = getTypeId();
+            switch(type_id)
+            {
+                case TypeIndex::UInt8:
+                    serializer = std::make_unique<Web3Serializer<UInt8>>();
+                    break;
+                case TypeIndex::UInt16:
+                    serializer = std::make_unique<Web3Serializer<UInt16>>();
+                    break;
+                case TypeIndex::UInt32:
+                    serializer = std::make_unique<Web3Serializer<UInt32>>();
+                    break;
+                case TypeIndex::UInt64:
+                    serializer = std::make_unique<Web3Serializer<UInt64>>();
+                    break;
+                case TypeIndex::UInt128:
+                    serializer = std::make_unique<Web3Serializer<UInt128>>();
+                    break;
+                case TypeIndex::UInt256:
+                    serializer = std::make_unique<Web3Serializer<UInt256>>();
+                    break;
+                case TypeIndex::Int8:
+                    serializer = std::make_unique<Web3Serializer<Int8>>();
+                    break;
+                case TypeIndex::Int16:
+                    serializer = std::make_unique<Web3Serializer<Int16>>();
+                    break;
+                case TypeIndex::Int32:
+                    serializer = std::make_unique<Web3Serializer<Int32>>();
+                    break;
+                case TypeIndex::Int64:
+                    serializer = std::make_unique<Web3Serializer<Int64>>();
+                    break;
+                case TypeIndex::Int128:
+                    serializer = std::make_unique<Web3Serializer<Int128>>();
+                    break;
+                case TypeIndex::Int256:
+                    serializer = std::make_unique<Web3Serializer<Int256>>();
+                    break;
+                default:
+                    throw std::logic_error("Wrong type for field " + type_name->getName());
+            }
+            auto customizer = std::make_unique<DataTypeCustomDesc>(std::move(type_name), serializer);
+            setCustomization(std::move(customizer));
         }
 
         template <typename T>
@@ -58,10 +104,6 @@ namespace DB {
             deserializeText(column, istr, settings, true);
         }
 
-
-
-		static const auto RESCHEDULE_MS = 500;
-
 		StorageWeb3BlockPoller::StorageWeb3BlockPoller(
 						const StorageID & table_id_,
 						ContextPtr context_,
@@ -72,30 +114,25 @@ namespace DB {
 					WithContext(context_->getGlobalContext()),
 					web3block_settings(std::move(web3engine_settings_)),
                     format_name(web3block_settings->message_format),
-					// format_name(getContext()->getMacros()->expand(web3engine_settings_->message_format)),
 					log(&Poco::Logger::get("StorageWeb3Block (" + table_id_.table_name + ")")),
-					milliseconds_to_wait(RESCHEDULE_MS),
 					is_attach(is_attach_),
                     w3_check_new_block(std::make_shared<Web3Client>(web3block_settings->node_host_port)),
                     w3_block_retrieve(std::make_shared<Web3Client>(web3block_settings->node_host_port)),
                     last_check_timestamp(std::time(nullptr)),
                     polling_delay(web3block_settings->polling_delay)
 		{
+                // Set a Custom Serializer for all Number fields
                 auto cols = columns_.getAll();
                 for(auto& col : cols)
                 {
                     auto type = col.getTypeInStorage();
                     if(type->isValueRepresentedByNumber())
                     {
-                        // TODO: Remove this raw ptr, Provide type for Serializer
-                        auto mut = reinterpret_cast<const Web3NumerableType*>(type.get());
-                        auto custom = std::make_unique<DataTypeCustomDesc>(
-                            std::make_unique<DataTypeCustomFixedName>(type->getName()),
-                                std::make_unique<Web3Serializer<uint64_t>>());
-                        mut->setCustomization_(std::move(custom));
+                        std::reinterpret_pointer_cast<const Web3NumerableType>(type)->updateSerializer();
                     }
                 }
-                ColumnsDescription updated_col_description(columns_);
+                const ColumnsDescription& updated_col_description(columns_);
+
 				StorageInMemoryMetadata storage_metadata;
 				storage_metadata.setColumns(updated_col_description);
 				setInMemoryMetadata(storage_metadata);
@@ -107,14 +144,14 @@ namespace DB {
 				streaming_task->deactivate();
 
                 polling_task = getContext()->getMessageBrokerSchedulePool().createTask("Web3BlockPollingTask", [this]{ fetchingNewBlock(); });
-                retrieveing_task = getContext()->getMessageBrokerSchedulePool().createTask("Web3BlockREtrievingTask", [this]{ retrieveNewBlock(); });
+                retrieving_task = getContext()->getMessageBrokerSchedulePool().createTask("Web3BlockRetrievingTask", [this]{ retrieveNewBlock(); });
 		}
 
 		void StorageWeb3BlockPoller::read(
-				[[maybe_unused]]QueryPlan & query_plan,
-                [[maybe_unused]]const Names & column_names,
+				QueryPlan & /*query_plan*/,
+                const Names & /*column_names*/,
 				const StorageSnapshotPtr & /*storage_snapshot*/,
-				[[maybe_unused]]SelectQueryInfo & query_info,
+				SelectQueryInfo & /*query_info*/,
 				ContextPtr /*context*/,
 				QueryProcessingStage::Enum /*processed_stage*/,
 				size_t /*max_block_size*/,
@@ -125,11 +162,10 @@ namespace DB {
 
 		SinkToStoragePtr StorageWeb3BlockPoller::write(
 				const ASTPtr & /*query*/,
-				const StorageMetadataPtr & /*metadata_snapshot*/,
+				const StorageMetadataPtr & metadata_snapshot,
 				ContextPtr /*context*/)
 		{
-//                query->getTreeHash();
-				throw Exception(ErrorCodes::QUERY_NOT_ALLOWED, "Direct select is not allowed");
+				return std::make_shared<NullSinkToStorage>(metadata_snapshot->getSampleBlock());
 		}
 
 		void StorageWeb3BlockPoller::startup()
@@ -147,7 +183,6 @@ namespace DB {
 		{
             auto table_id = getStorageID();
 
-            // Check if at least one direct dependency is attached
             size_t num_views = DatabaseCatalog::instance().getDependentViews(table_id).size();
             if(num_views)
             {
@@ -196,7 +231,7 @@ namespace DB {
                 last_check_timestamp = static_cast<uint64_t>(std::time(nullptr));
                 if(w3_check_new_block->responseMessageSize())
                 {
-                    retrieveing_task->activateAndSchedule();
+                    retrieving_task->activateAndSchedule();
                 }
             }
             polling_task->activateAndSchedule();
@@ -204,14 +239,13 @@ namespace DB {
 
         void StorageWeb3BlockPoller::retrieveNewBlock()
         {
-            // TODO: add loop to get all blocks from the queue
             auto block = w3_check_new_block->popRawData();
             if(!block.empty())
             {
                 auto block_number = static_cast<uint64_t>(std::stoll(block, nullptr, 16));
                 if(block_number > last_block)
                 {
-                    retrieveing_task->activateAndSchedule();
+                    retrieving_task->activateAndSchedule();
                     last_block = block_number;
                     w3_block_retrieve->getBlock(last_block);
                 }
@@ -229,11 +263,6 @@ namespace DB {
 
 						if (args.storage_def->settings)
 								web3block_settings->loadFromQuery(*args.storage_def);
-
-//						if (!web3block_settings->rabbitmq_host_port.changed
-//							 && !web3block_settings->rabbitmq_address.changed)
-//										throw Exception("You must specify either `rabbitmq_host_port` or `rabbitmq_address` settings",
-//												ErrorCodes::NUMBER_OF_ARGUMENTS_DOESNT_MATCH);
 
 						if (!web3block_settings->message_format.changed)
 								throw Exception( ErrorCodes::NUMBER_OF_ARGUMENTS_DOESNT_MATCH, "You must specify `message_format` setting");

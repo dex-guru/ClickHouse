@@ -12,11 +12,10 @@
 
 namespace DB {
 
-        class Web3NumerableType : public DB::IDataType // DataTypeNumberBase
+        class Web3NumerableType : public DB::IDataType
         {
         public:
-            void setCustomization_(DataTypeCustomDescPtr custom_desc_) const;
-
+            void updateSerializer() const;
         };
 
         template <typename T>
@@ -78,22 +77,21 @@ namespace DB {
 				std::unique_ptr<StorageWeb3BlockPollerSettings> web3block_settings;
 				const String format_name;
 				Poco::Logger * log;
-		[[maybe_unused]]		uint64_t milliseconds_to_wait;
-		[[maybe_unused]]		bool is_attach;
+		        bool is_attach;
 
 				mutable bool drop_table = false;
 				std::atomic<bool> mv_attached = false;
-		[[maybe_unused]]size_t max_rows_per_message;
+
 				BackgroundSchedulePool::TaskHolder streaming_task;
 				BackgroundSchedulePool::TaskHolder polling_task;
-				BackgroundSchedulePool::TaskHolder retrieveing_task;
+				BackgroundSchedulePool::TaskHolder retrieving_task;
 
 		        Web3ClientPtr w3_check_new_block;
 		        Web3ClientPtr w3_block_retrieve;
-        [[maybe_unused]]uint64_t last_check_timestamp;
+                uint64_t last_check_timestamp;
 
-		[[maybe_unused]]uint64_t last_block = 0;
-		[[maybe_unused]]uint8_t polling_delay = 2;
+		        uint64_t last_block = 0;
+		        uint8_t polling_delay = 2;
 
 				void streamToViews();
 				void streamingToViewsFunc();
@@ -103,10 +101,6 @@ namespace DB {
 
                 // Load a new block
                 void retrieveNewBlock();
-
-                // Bloom filter
-                void loadBloomFilter();
-                void saveBloomFilter();
 		};
 }
 
