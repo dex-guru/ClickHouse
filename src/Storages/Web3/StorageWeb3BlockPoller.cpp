@@ -205,9 +205,8 @@ namespace DB {
             auto block_header = storage_snapshot->metadata->getSampleBlockNonMaterialized();
 
             auto column_names = block_io.pipeline.getHeader().getNames();
-            auto block_size = 10;
             auto ws = std::make_shared<Web3Source>(*this, getStorageSnapshot(getInMemoryMetadataPtr(), getContext()),
-                                                   web3block_context, column_names, block_size, *w3_block_retrieve);
+                                                   web3block_context, column_names, max_block_size, *w3_block_retrieve);
             Pipes pipes;
 
             std::vector<std::shared_ptr<Web3Source>> sources;

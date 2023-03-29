@@ -93,6 +93,8 @@ namespace DB {
 		        uint64_t last_block = 0;
 		        uint8_t polling_delay = 2;
 
+                size_t max_block_size = 8192;
+
 				void streamToViews();
 				void streamingToViewsFunc();
 
