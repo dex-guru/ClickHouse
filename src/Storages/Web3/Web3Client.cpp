@@ -1,7 +1,6 @@
 #include <Storages/Web3/Web3Client.h>
 #include <IO/ReadBufferFromMemory.h>
 #include <Common/hex.h>
-#include <mutex>
 #include <memory>
 
 namespace DB {
@@ -13,10 +12,10 @@ namespace DB {
             return std::make_shared<ReadBufferFromMemory>(current.data(), current.size());
 		}
 
-        Web3Client::Web3Client(const std::string node_url, Poco::Logger* log_)
+        Web3Client::Web3Client(const String& node_url_, Poco::Logger* log_)
         :
             log(log_),
-            connect(std::make_shared<NodeConnection>(node_url, log_)),
+            connect(std::make_shared<NodeConnection>(node_url_, log_)),
             message_queue(100)
         {
 
