@@ -28,7 +28,7 @@ namespace DB {
             connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
         }
 
-        void Web3Client::getBlock(uint64_t block_number)
+        void Web3Client::getBlock(uint64_t block_number, bool include_transactions)
         {
             auto block_hex = getHexUIntLowercase(block_number);
             if(block_hex[0] == '0')
@@ -42,7 +42,8 @@ namespace DB {
                 }
             }
 
-            auto request = NodeCall{"eth_getBlockByNumber", {"0x" + block_hex, "true"}, "1"};
+            auto request = NodeCall{"eth_getBlockByNumber",
+                                    {"0x" + block_hex, include_transactions ? "true" : "false"}, "1"};
             connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
         }
 

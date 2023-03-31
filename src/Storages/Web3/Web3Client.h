@@ -27,7 +27,7 @@ namespace DB{
 
             // Web3 calls
             void getLastBlockNumber();
-            void getBlock(uint64_t block_number);
+            void getBlock(uint64_t block_number, bool include_transactions = false);
             void getTransactionReceipt(String transaction_hash);
             // --------
 
