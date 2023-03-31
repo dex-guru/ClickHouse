@@ -17,7 +17,7 @@ namespace DB{
 		public:
 
             // Create a stand-alone config for web3
-            Web3Client(const std::string node_url_);
+            Web3Client(const std::string node_url_, Poco::Logger* log_);
 
             /*
                     @returns last fetched message from Web3Client;
@@ -38,6 +38,8 @@ namespace DB{
 		private:
 				void callRequest();
                 void receiveRequestCallback(String&& buffer);
+
+                Poco::Logger* log;
 
         public:
                 NodeConnectionPtr connect;

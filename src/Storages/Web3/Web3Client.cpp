@@ -13,10 +13,11 @@ namespace DB {
             return std::make_shared<ReadBufferFromMemory>(current.data(), current.size());
 		}
 
-        Web3Client::Web3Client(const std::string node_url)
+        Web3Client::Web3Client(const std::string node_url, Poco::Logger* log_)
         :
-            connect(std::make_shared<NodeConnection>(node_url)),
-            message_queue(100) //TODO: createa a config
+            log(log_),
+            connect(std::make_shared<NodeConnection>(node_url, log_)),
+            message_queue(100)
         {
 
         }

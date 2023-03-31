@@ -1,5 +1,5 @@
-#include <memory>
-#include <IO/ReadBufferFromIStream.h>
+
+#include <Common/logger_useful.h>
 #include <IO/ReadBufferFromMemory.h>
 #include <Storages/Web3/NodeConnection.h>
 #include <rapidjson/document.h>
@@ -68,7 +68,6 @@ void INodeConnection::call(const NodeCall & request, NodeRequestCallback callbac
     }
     catch (...)
     {
-        // Update buffer. Lor error
         throw;
     }
 }
@@ -77,7 +76,8 @@ INodeConnection::~INodeConnection()
 {
 }
 
-INodeConnection::INodeConnection(const std::string & url_)
+INodeConnection::INodeConnection(const std::string & url_, Poco::Logger* log_)
+    : log(log_)
 {
     configuration.url = url_;
 }
@@ -107,6 +107,7 @@ void NodeConnection::callImplementation(const NodeCall & request, NodeRequestCal
     auto payload = request.dumpToJsonString();
 
     req.setContentLength(payload.size());
+    LOG_DEBUG(log, "Connecting to node: {}, method {}", configuration.url, request.method);
     std::ostream & os = session.sendRequest(req);
     os << payload; // sends the body
 
@@ -115,6 +116,8 @@ void NodeConnection::callImplementation(const NodeCall & request, NodeRequestCal
         std::string error = "Web3Client Response Error. " + res.getReason();
         throw Exception(ErrorCodes::BAD_ARGUMENTS, error.c_str());
     }
+
+    LOG_DEBUG(log, "Received response from node: {}, method {}, size {}", configuration.url, request.method, res.size());
 
     rapidjson::Document response_json;
     rapidjson::IStreamWrapper isw(session.receiveResponse(res));
@@ -152,7 +155,7 @@ void NodeConnection::callImplementation(const NodeCall & request, NodeRequestCal
     }
 }
 
-NodeConnection::NodeConnection(const std::string & url_) : INodeConnection(url_)
+NodeConnection::NodeConnection(const std::string & url_, Poco::Logger* log_) : INodeConnection(url_, log_)
 {
 }
 

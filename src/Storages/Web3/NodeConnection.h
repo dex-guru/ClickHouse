@@ -35,7 +35,7 @@ class INodeConnection
     };
 
 public:
-    INodeConnection(const std::string & url);
+    INodeConnection(const std::string & url, Poco::Logger* log_);
     virtual ~INodeConnection();
     void call(const NodeCall & request, NodeRequestCallback callback);
 
@@ -50,12 +50,13 @@ private:
 
 protected:
     Configuration configuration;
+    Poco::Logger* log;
 };
 
 class NodeConnection : public INodeConnection
 {
 public:
-    NodeConnection(const std::string & url);
+    NodeConnection(const std::string & url, Poco::Logger* log_);
 
 private:
     void callImplementation(const NodeCall & request, NodeRequestCallback callback) override;

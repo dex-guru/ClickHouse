@@ -116,8 +116,8 @@ namespace DB {
                     format_name(web3block_settings->message_format),
 					log(&Poco::Logger::get("StorageWeb3Block (" + table_id_.table_name + ")")),
 					is_attach(is_attach_),
-                    w3_check_new_block(std::make_shared<Web3Client>(web3block_settings->node_host_port)),
-                    w3_block_retrieve(std::make_shared<Web3Client>(web3block_settings->node_host_port)),
+                    w3_check_new_block(std::make_shared<Web3Client>(web3block_settings->node_host_port, log)),
+                    w3_block_retrieve(std::make_shared<Web3Client>(web3block_settings->node_host_port, log)),
                     last_check_timestamp(std::time(nullptr)),
                     polling_delay(web3block_settings->polling_delay)
 		{
@@ -194,7 +194,7 @@ namespace DB {
             streaming_task->activateAndSchedule();
 		}
 
-		void StorageWeb3BlockPoller::streamToViews()
+		void StorageWeb3BlockPoller::streamToViews() 
 		{
             auto insert = std::make_shared<ASTInsertQuery>();
             auto table_id = getStorageID();
