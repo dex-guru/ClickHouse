@@ -1,7 +1,6 @@
 #include <Storages/Web3/Web3Client.h>
 #include <IO/ReadBufferFromMemory.h>
 #include <Common/hex.h>
-#include <mutex>
 #include <memory>
 
 namespace DB {
@@ -13,10 +12,11 @@ namespace DB {
             return std::make_shared<ReadBufferFromMemory>(current.data(), current.size());
 		}
 
-        Web3Client::Web3Client(const std::string node_url)
+        Web3Client::Web3Client(const String& node_url_, Poco::Logger* log_)
         :
-            connect(std::make_shared<NodeConnection>(node_url)),
-            message_queue(100) //TODO: createa a config
+            log(log_),
+            connect(std::make_shared<NodeConnection>(node_url_, log_)),
+            message_queue(100)
         {
 
         }
@@ -27,7 +27,7 @@ namespace DB {
             connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
         }
 
-        void Web3Client::getBlock(uint64_t block_number)
+        void Web3Client::getBlock(uint64_t block_number, bool include_transactions)
         {
             auto block_hex = getHexUIntLowercase(block_number);
             if(block_hex[0] == '0')
@@ -41,7 +41,8 @@ namespace DB {
                 }
             }
 
-            auto request = NodeCall{"eth_getBlockByNumber", {"0x" + block_hex, "true"}, "1"};
+            auto request = NodeCall{"eth_getBlockByNumber",
+                                    {"0x" + block_hex, include_transactions ? "true" : "false"}, "1"};
             connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
         }
 

@@ -13,21 +13,15 @@ namespace DB{
 		{
             using Web3MessageQueue = ConcurrentBoundedQueue<String>;
 
-
 		public:
+            Web3Client(const String& node_url_, Poco::Logger* log_);
 
-            // Create a stand-alone config for web3
-            Web3Client(const std::string node_url_);
-
-            /*
-                    @returns last fetched message from Web3Client;
-            */
+            //@returns last fetched message from Web3Client;
             ReadBufferPtr consume();
-
 
             // Web3 calls
             void getLastBlockNumber();
-            void getBlock(uint64_t block_number);
+            void getBlock(uint64_t block_number, bool include_transactions=false);
             void getTransaction(String transaction_hash);
             void getTransactionReceipt(String transaction_hash);
             // --------
@@ -37,9 +31,9 @@ namespace DB{
             size_t responseMessageSize() const;
 
 		private:
-				void callRequest();
                 void receiveRequestCallback(String&& buffer);
 
+                [[maybe_unused]]Poco::Logger* log;
         public:
                 NodeConnectionPtr connect;
                 Web3MessageQueue message_queue;
