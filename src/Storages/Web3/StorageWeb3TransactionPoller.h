@@ -11,12 +11,18 @@
 #include <Storages/Web3/Web3Source.h>
 #include <Storages/Web3/Web3Client.h>
 #include <Processors/Sinks/SinkToStorage.h>
+#include <Common/ConcurrentBoundedQueue.h>
+#include <Storages/Web3/BaseWeb3Storage.h>
+
 
 namespace DB
 {
+
     class TransactionSink;
 
-    class StorageWeb3TransactionPoller : public IStorage, WithContext
+    using HashQueue = ConcurrentBoundedQueue<String>;
+
+    class StorageWeb3TransactionPoller : public BaseWeb3Storage
     {
     public:
         StorageWeb3TransactionPoller(
@@ -28,15 +34,10 @@ namespace DB
 
         std::string getName() const override { return "Web3Transactions"; }
 
-        bool noPushingToViews() const override { return false; }
-
-        const String & getFormatName() const { return format_name; }
-
         void startup() override;
         void shutdown() override;
 
-
-        void checkTableCanBeDropped() const override { drop_table = true; }
+        void pushTransactionHash(const String& hash_);
 
         /// Always return virtual columns in addition to required columns
         void read(
@@ -57,12 +58,13 @@ namespace DB
         bool prefersLargeBlocks() const override { return false; }
 
     private:
-        ContextMutablePtr web3transaction_context;
-        std::unique_ptr<StorageWeb3BlockPollerSettings> web3_transaction_settings;
-        mutable bool drop_table = false;
-        const String format_name;
-    [[maybe_unused]] bool is_attach;
-        Poco::Logger * log;
+        ColumnsDescription output_columns; // Columns for ISource, annotated by user
+
+        // Blocks that we received from Web3Blockpoller
+        HashQueue hashes;
+        Web3ClientPtr w3;
+
+        void retrieveTransaction();
     };
 
     class TransactionSink : public SinkToStorage
