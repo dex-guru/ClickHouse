@@ -58,6 +58,12 @@ namespace DB {
             connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
         }
 
+        void Web3Client::netVersion()
+        {
+            auto request = NodeCall{"net_version", {}, "1"};
+            connect->call(request, [this](String&& buffer){ receiveRequestCallback(std::move(buffer));});
+        }
+
         void Web3Client::receiveRequestCallback(String&& data_string)
         {
             if(message_queue.push(std::move(data_string)))

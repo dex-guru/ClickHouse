@@ -24,6 +24,7 @@ namespace DB{
             void getBlock(uint64_t block_number, bool include_transactions=false);
             void getTransaction(String transaction_hash);
             void getTransactionReceipt(String transaction_hash);
+            void netVersion();
             // --------
 
             // Returns raw response
