@@ -203,7 +203,7 @@ void StorageWeb3BlockPoller::streamToViews()
     auto block_header = storage_snapshot->metadata->getSampleBlockNonMaterialized();
 
     auto column_names = block_io.pipeline.getHeader().getNames();
-    auto ws = std::make_shared<Web3Source>(
+    auto ws = std::make_shared<Web3Source<StorageWeb3BlockPoller>>(
         *this,
         getStorageSnapshot(getInMemoryMetadataPtr(), getContext()),
         w3_context,
@@ -212,7 +212,7 @@ void StorageWeb3BlockPoller::streamToViews()
         *w3_block_retrieve);
     Pipes pipes;
 
-    std::vector<std::shared_ptr<Web3Source>> sources;
+    std::vector<std::shared_ptr<Web3Source<StorageWeb3BlockPoller>>> sources;
 
     sources.emplace_back(ws);
     pipes.emplace_back(ws);

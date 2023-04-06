@@ -156,7 +156,7 @@ namespace DB {
         auto block_header = storage_snapshot->metadata->getSampleBlockNonMaterialized();
 
         Pipes pipes;
-        std::vector<std::shared_ptr<Web3Source>> sources;
+        std::vector<std::shared_ptr<Web3Source<StorageWeb3TransactionPoller>>> sources;
 
         // Customize this object
         auto column_names = block_io.pipeline.getHeader().getNames();
@@ -169,13 +169,13 @@ namespace DB {
 
             w3->getTransaction(std::move(hash));
 
-//            auto ws = std::make_shared<Web3Source>(
-//                    *this,
-//                    getStorageSnapshot(getInMemoryMetadataPtr(), getContext()),
-//                    w3_context, column_names, max_block_size, *w3
-//                );
-//            sources.emplace_back(ws);
-//            pipes.emplace_back(ws);
+            auto ws = std::make_shared<Web3Source<StorageWeb3TransactionPoller>>(
+                    *this,
+                    getStorageSnapshot(getInMemoryMetadataPtr(), getContext()),
+                    w3_context, column_names, max_block_size, *w3
+                );
+            sources.emplace_back(ws);
+            pipes.emplace_back(ws);
         }
 
         block_io.pipeline.complete(Pipe::unitePipes(std::move(pipes)));
