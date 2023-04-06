@@ -12,6 +12,22 @@
 namespace DB
 {
 
+class Web3NumerableType : public DB::IDataType
+{
+public:
+    void updateSerializer() const;
+};
+
+template <typename T>
+class Web3Serializer : public SerializationNumber<T>
+{
+public:
+    Web3Serializer() = default;
+
+    void deserializeText(IColumn & column, ReadBuffer & istr, const FormatSettings & settings, bool whole) const override;
+    void deserializeTextJSON(IColumn & column, ReadBuffer & istr, const FormatSettings &) const override;
+};
+
 class BaseWeb3Storage : public IStorage, public WithContext
 {
 public:

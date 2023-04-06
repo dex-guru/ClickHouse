@@ -14,25 +14,6 @@
 namespace DB
 {
 
-class Web3NumerableType : public DB::IDataType
-{
-public:
-    void updateSerializer() const;
-};
-
-template <typename T>
-class Web3Serializer : public SerializationNumber<T>
-{
-public:
-    Web3Serializer() = default;
-
-    void deserializeText(IColumn & column, ReadBuffer & istr, const FormatSettings & settings, bool whole) const override;
-    void deserializeTextJSON(IColumn & column, ReadBuffer & istr, const FormatSettings &) const override;
-};
-
-/*
-@todo Create an interface for all web3 storages to pass it into Web3Source class
-*/
 class StorageWeb3BlockPoller : public BaseWeb3Storage
 {
 public:
