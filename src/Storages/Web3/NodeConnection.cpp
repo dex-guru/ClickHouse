@@ -66,9 +66,9 @@ void INodeConnection::call(const NodeCall & request, NodeRequestCallback callbac
     {
         callImplementation(request, callback);
     }
-    catch (...)
+    catch (const Exception& e)
     {
-        throw;
+        LOG_ERROR(log, "{}", e.message());
     }
 }
 
