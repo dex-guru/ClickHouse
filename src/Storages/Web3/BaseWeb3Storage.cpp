@@ -20,7 +20,7 @@ namespace DB
     : IStorage(table_id_)
     , WithContext(context_->getGlobalContext())
     , w3_settings(std::move(web3engine_settings_))
-    , format_name(web3engine_settings_->message_format)
+    , format_name(w3_settings->message_format)
     , log(log_)
     , is_attach(is_attach_)
     {
@@ -103,5 +103,4 @@ namespace DB
     {
         deserializeText(column, istr, settings, true);
     }
-
 }
