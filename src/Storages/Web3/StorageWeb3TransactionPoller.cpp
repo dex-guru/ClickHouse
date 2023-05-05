@@ -6,7 +6,6 @@
 #include <Storages/StorageFactory.h>
 #include <Storages/ExternalDataSourceConfiguration.h>
 #include <Interpreters/Context.h>
-#include <DataTypes/DataTypeArray.h>
 #include <Columns/ColumnsNumber.h>
 #include <Columns/ColumnArray.h>
 #include <Columns/ColumnString.h>
@@ -17,173 +16,174 @@
 #include <QueryPipeline/Pipe.h>
 #include <Storages/Web3/Web3Source.h>
 
+#include <DataTypes/DataTypeArray.h>
+#include <DataTypes/DataTypeString.h>
 
-namespace DB {
 
-    namespace ErrorCodes
-    {
-        extern const int LOGICAL_ERROR;
-        extern const int BAD_ARGUMENTS;
-        extern const int NUMBER_OF_ARGUMENTS_DOESNT_MATCH;
-        extern const int QUERY_NOT_ALLOWED;
-    }
+namespace DB
+{
 
-    TransactionSink::TransactionSink(
-        StorageWeb3TransactionPoller & storage_,
-        StorageMetadataPtr metadata_snapshot_,
-        [[maybe_unused]]size_t max_parts_per_block_,
-        [[maybe_unused]]ContextPtr context_)
-        : SinkToStorage(metadata_snapshot_->getSampleBlock())
-        , storage(storage_)
-    {
+namespace ErrorCodes
+{
+    extern const int LOGICAL_ERROR;
+    extern const int BAD_ARGUMENTS;
+    extern const int NUMBER_OF_ARGUMENTS_DOESNT_MATCH;
+    extern const int QUERY_NOT_ALLOWED;
+}
 
-    }
-    /*
+TransactionSink::TransactionSink(
+    StorageWeb3TransactionPoller & storage_,
+    [[maybe_unused]] StorageMetadataPtr metadata_snapshot_,
+    [[maybe_unused]] size_t max_parts_per_block_,
+    [[maybe_unused]] ContextPtr context_)
+    : SinkToStorage(metadata_snapshot_->getSampleBlock()), storage(storage_)
+{
+}
+/*
      * TODO: enumerate all rows if it gets more than 1 row
      * */
-    void TransactionSink::consume(Chunk chunk)
+void TransactionSink::consume(Chunk chunk)
+{
+    auto block = getHeader().cloneWithColumns(chunk.detachColumns());
+    auto hashes_column = block.getByName("transactions");
+    //        size_t rows = block.rows();
+
+    const auto & array_column = static_cast<const ColumnArray &>(*hashes_column.column);
+    const auto & string_column = static_cast<const ColumnString &>(*array_column.getDataPtr());
+
+    for (size_t i = 0; i < string_column.size(); i++)
     {
-        auto block = getHeader().cloneWithColumns(chunk.detachColumns());
-        auto hashes_column = block.getByName("transactions");
-//        size_t rows = block.rows();
+        auto g = string_column[i];
+        String hash = g.get<String>();
+        storage.pushTransactionHash(hash);
+    }
+}
 
-        const auto &array_column = static_cast<const ColumnArray &>(*hashes_column.column);
-        const auto &string_column = static_cast<const ColumnString &>(*array_column.getDataPtr());
+void TransactionSink::onStart()
+{
+}
 
-        for(size_t i =0; i < string_column.size(); i++)
-        {
-            auto g = string_column[i];
-            String hash = g.get<String>();
-            storage.pushTransactionHash(hash);
-        }
+void TransactionSink::onFinish()
+{
+}
+
+TransactionSink::~TransactionSink()
+{
+}
+
+StorageWeb3TransactionPoller::StorageWeb3TransactionPoller(
+    const StorageID & table_id_,
+    ContextPtr context_,
+    const ColumnsDescription & columns_,
+    std::unique_ptr<StorageWeb3BlockPollerSettings> web3engine_settings_,
+    bool is_attach_)
+    : BaseWeb3Storage(
+        table_id_,
+        context_,
+        std::move(web3engine_settings_),
+        is_attach_,
+        &Poco::Logger::get("StorageWeb3Transaction (" + table_id_.table_name + ")"))
+    , hashes(HashQueue(500))
+    , w3(std::make_shared<Web3Client>(w3_settings->node_host_port, log))
+{
+    w3_context = Context::createCopy(getContext());
+    w3_context->makeQueryContext();
+
+    StorageInMemoryMetadata storage_metadata;
+
+    output_cols = columns_.getAll();
+
+    NamesAndTypesList input_cols;
+    auto str = std::make_shared<DataTypeString>();
+    auto transaction = std::make_shared<DataTypeArray>(str);
+    input_cols.push_back({"transactions", transaction});
+
+    storage_metadata.setColumns(ColumnsDescription(std::move(input_cols)));
+    setInMemoryMetadata(storage_metadata);
+}
+
+void StorageWeb3TransactionPoller::startup()
+{
+}
+
+void StorageWeb3TransactionPoller::shutdown()
+{
+}
+
+void StorageWeb3TransactionPoller::pushTransactionHash(const String & hash_)
+{
+    if (!hashes.push(hash_))
+    {
+        LOG_ERROR(log, "Can't push Transaction's hash {}", hash_);
+    }
+}
+
+void StorageWeb3TransactionPoller::streamingToViewsFunc()
+{
+    auto table_id = getStorageID();
+
+    size_t num_views = DatabaseCatalog::instance().getDependentViews(table_id).size();
+    if (num_views)
+    {
+        mv_attached.store(true);
+        LOG_DEBUG(log, "Started streaming to {} attached views", num_views);
+        retrieveTransaction();
+        mv_attached.store(false);
+    }
+    //        streaming_task->activateAndSchedule();
+}
+
+Block StorageWeb3TransactionPoller::getOutputBlock()
+{
+    Block res;
+
+    for (const auto & column : output_cols)
+        res.insert({column.type->createColumn(), column.type, column.name});
+
+    return res;
+}
+
+void StorageWeb3TransactionPoller::retrieveTransaction()
+{
+    if(hashes.empty())
+        return;
+
+    auto insert = std::make_shared<ASTInsertQuery>();
+    auto table_id = getStorageID();
+    insert->table_id = table_id;
+    InterpreterInsertQuery interpreter(insert, w3_context, false, true, true);
+    auto block_io = interpreter.execute();
+//    auto storage_snapshot = getStorageSnapshot(getInMemoryMetadataPtr(), getContext());
+    Block block_header = getOutputBlock();
+    Pipes pipes;
+    std::vector<std::shared_ptr<Web3Source<StorageWeb3TransactionPoller>>> sources;
+
+    // Customize this object
+    auto column_names = block_header.getNames();
+
+    while(!hashes.empty())
+    {
+        String hash;
+        if(!hashes.pop(hash))
+            break;
+
+        w3->getTransaction(std::move(hash));
+
+        auto ws = std::make_shared<Web3Source<StorageWeb3TransactionPoller>>(
+                *this,
+                getStorageSnapshot(getInMemoryMetadataPtr(), getContext()),
+                w3_context, column_names, max_block_size, *w3
+            );
+        sources.emplace_back(ws);
+        pipes.emplace_back(ws);
     }
 
-    void TransactionSink::onStart()
+    block_io.pipeline.complete(Pipe::unitePipes(std::move(pipes)));
     {
-
+        CompletedPipelineExecutor executor(block_io.pipeline);
+        executor.execute();
     }
-
-    void TransactionSink::onFinish()
-    {
-
-    }
-
-    TransactionSink::~TransactionSink() {}
-
-    StorageWeb3TransactionPoller::StorageWeb3TransactionPoller(
-        const StorageID & table_id_,
-        ContextPtr context_,
-        const ColumnsDescription & columns_,
-        std::unique_ptr<StorageWeb3BlockPollerSettings> web3engine_settings_,
-        bool is_attach_)
-        : BaseWeb3Storage(
-            table_id_,
-            context_,
-            std::move(web3engine_settings_),
-            is_attach_,
-            &Poco::Logger::get("StorageWeb3Transaction (" + table_id_.table_name + ")"))
-        , hashes(HashQueue(500))
-        , w3(std::make_shared<Web3Client>(web3engine_settings_->node_host_port, log))
-    {
-
-        w3_context = Context::createCopy(getContext());
-        w3_context->makeQueryContext();
-
-        StorageInMemoryMetadata storage_metadata;
-
-        NamesAndTypesList input_types;
-        NamesAndTypesList output_types;
-
-        for(auto& col : columns_.getAll())
-        {
-            auto name = col.getNameInStorage();
-            if(name.starts_with("input_"))
-            {
-                String new_name = name.substr(6);
-                input_types.push_back({new_name, col.getTypeInStorage()});
-            }
-            else
-            {
-                output_types.push_back({name, col.getTypeInStorage()});
-            }
-        }
-
-        if(input_types.empty())
-            throw Exception(
-                ErrorCodes::BAD_ARGUMENTS,
-                "No any `input_` types");
-
-        if(output_types.empty())
-            throw Exception(
-                ErrorCodes::BAD_ARGUMENTS,
-                "No any output types");
-
-        output_columns = ColumnsDescription(std::move(output_types));
-
-        storage_metadata.setColumns(ColumnsDescription(std::move(input_types)));
-        setInMemoryMetadata(storage_metadata);
-    }
-
-    void StorageWeb3TransactionPoller::startup()
-    {
-
-    }
-
-    void StorageWeb3TransactionPoller::shutdown()
-    {
-
-    }
-
-    void StorageWeb3TransactionPoller::pushTransactionHash(const String& hash_)
-    {
-        if(!hashes.push(hash_))
-        {
-            LOG_ERROR(log, "Can't push Transaction's hash {}", hash_);
-        }
-    }
-
-    void StorageWeb3TransactionPoller::retrieveTransaction()
-    {
-        if(hashes.empty())
-            return;
-
-        auto insert = std::make_shared<ASTInsertQuery>();
-        auto table_id = getStorageID();
-        insert->table_id = table_id;
-        InterpreterInsertQuery interpreter(insert, w3_context, false, true, true);
-        auto block_io = interpreter.execute();
-        auto storage_snapshot = getStorageSnapshot(getInMemoryMetadataPtr(), getContext());
-        auto block_header = storage_snapshot->metadata->getSampleBlockNonMaterialized();
-
-        Pipes pipes;
-        std::vector<std::shared_ptr<Web3Source<StorageWeb3TransactionPoller>>> sources;
-
-        // Customize this object
-        auto column_names = block_io.pipeline.getHeader().getNames();
-
-        while(!hashes.empty())
-        {
-            String hash;
-            if(!hashes.pop(hash))
-                break;
-
-            w3->getTransaction(std::move(hash));
-
-            auto ws = std::make_shared<Web3Source<StorageWeb3TransactionPoller>>(
-                    *this,
-                    getStorageSnapshot(getInMemoryMetadataPtr(), getContext()),
-                    w3_context, column_names, max_block_size, *w3
-                );
-            sources.emplace_back(ws);
-            pipes.emplace_back(ws);
-        }
-
-        block_io.pipeline.complete(Pipe::unitePipes(std::move(pipes)));
-        {
-            CompletedPipelineExecutor executor(block_io.pipeline);
-            executor.execute();
-        }
-    }
+}
 
     void StorageWeb3TransactionPoller::read(
         QueryPlan & /*query_plan*/,
@@ -195,6 +195,7 @@ namespace DB {
         size_t /*max_block_size*/,
         size_t /*num_streams*/)
     {
+        retrieveTransaction();
         throw Exception(ErrorCodes::QUERY_NOT_ALLOWED, "Direct select is not allowed");
     }
 

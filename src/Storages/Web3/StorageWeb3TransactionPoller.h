@@ -57,14 +57,20 @@ namespace DB
 
         bool prefersLargeBlocks() const override { return false; }
 
+        Block getSampleBlockNonMaterialized() override { return getOutputBlock(); }
+
     private:
-        ColumnsDescription output_columns; // Columns for ISource, annotated by user
+        NamesAndTypesList output_cols; // Columns for ISource, hardcoded;
 
         // Blocks that we received from Web3Blockpoller
         HashQueue hashes;
         Web3ClientPtr w3;
 
+        std::atomic<bool> mv_attached = false;
+
         void retrieveTransaction();
+        void streamingToViewsFunc();
+        Block getOutputBlock();
     };
 
     class TransactionSink : public SinkToStorage
