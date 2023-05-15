@@ -86,20 +86,43 @@ StorageWeb3TransactionPoller::StorageWeb3TransactionPoller(
     , hashes(HashQueue(500))
     , w3(std::make_shared<Web3Client>(w3_settings->node_host_port, log))
 {
-    w3_context = Context::createCopy(getContext());
-    w3_context->makeQueryContext();
+//    w3_context = Context::createCopy(getContext());
+//    w3_context->makeQueryContext();
+//
+//    StorageInMemoryMetadata storage_metadata;
+//
+//    output_cols = columns_.getAll();
+//
+//    NamesAndTypesList input_cols;
+//    auto str = std::make_shared<DataTypeString>();
+//    auto transaction = std::make_shared<DataTypeArray>(str);
+//    input_cols.push_back({"transactions", transaction});
+//
+//    storage_metadata.setColumns(ColumnsDescription(std::move(input_cols)));
+//    setInMemoryMetadata(storage_metadata);
 
-    StorageInMemoryMetadata storage_metadata;
+    NamesAndTypesList cols = columns_.getAll();
 
-    output_cols = columns_.getAll();
+    for (auto & col : cols)
+    {
+        auto type = col.getTypeInStorage();
+        if (type->isValueRepresentedByNumber())
+        {
+            std::reinterpret_pointer_cast<const Web3NumerableType>(type)->updateSerializer();
+        }
+    }
 
-    NamesAndTypesList input_cols;
     auto str = std::make_shared<DataTypeString>();
     auto transaction = std::make_shared<DataTypeArray>(str);
-    input_cols.push_back({"transactions", transaction});
+    cols.push_back({"transactions", transaction});
 
-    storage_metadata.setColumns(ColumnsDescription(std::move(input_cols)));
+
+    StorageInMemoryMetadata storage_metadata;
+    storage_metadata.setColumns(ColumnsDescription(std::move(cols)));
     setInMemoryMetadata(storage_metadata);
+
+    w3_context = Context::createCopy(getContext());
+    w3_context->makeQueryContext();
 }
 
 void StorageWeb3TransactionPoller::startup()

@@ -57,7 +57,7 @@ namespace DB
 
         bool prefersLargeBlocks() const override { return false; }
 
-        Block getSampleBlockNonMaterialized() override { return getOutputBlock(); }
+        Block getSampleBlockNonMaterialized() { return getOutputBlock(); }
 
     private:
         NamesAndTypesList output_cols; // Columns for ISource, hardcoded;
